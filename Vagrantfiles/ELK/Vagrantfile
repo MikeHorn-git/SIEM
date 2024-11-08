@@ -1,0 +1,46 @@
+# frozen_string_literal: true
+
+Vagrant.configure('2') do |config|
+  config.vm.box = 'vadbes46/centos-box-7'
+  config.vm.box_version = '4.8.0'
+
+  config.vm.hostname = 'elk'
+  config.vm.synced_folder '.', '/vagrant', disabled: true
+
+  config.vm.network 'public_network', bridge: 'wlp0s20f3'
+
+  config.vm.provider 'virtualbox' do |vb|
+    vb.cpus = 4
+    vb.memory = '8192'
+    vb.name = 'ELK'
+    vb.customize ['modifyvm', :id, '--clipboard', 'bidirectional']
+  end
+
+  config.vm.provision 'shell', inline: <<-SHELL, privileged: false
+    sudo localectl set-keymap fr
+
+    sudo systemctl enable --now elasticsearch
+    sudo systemctl enable --now logstash
+    sudo systemctl enable --now kibana
+
+    sudo nmcli connection add type ethernet ifname eth2 con-name eth2-static \
+    ipv4.addresses 192.168.56.25/24 \
+    ipv4.gateway 192.168.56.1 \
+    ipv4.dns "1.1.1.1 1.0.0.1" \
+    ipv4.method manual
+
+    sudo nmcli connection up eth2-static
+
+    sudo nmcli connection down eth2-static
+    sudo nmcli connection up eth2-static
+
+    curl -L -O https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-7.15.2-linux-x86_64.tar.gz
+    tar xzvf elastic-agent-7.15.2-linux-x86_64.tar.gz
+    cd elastic-agent-7.15.2-linux-x86_64
+    # sudo ./elastic-agent install -f --url=http://192.168.56.20:8220 --enrollment-token=<token>== --insecure
+
+    # Avoid 'xterm-kitty': unknown terminal type
+    echo "TERM=xterm-256color" >> ~/.bashrc
+    source ~/.bashrc
+  SHELL
+end

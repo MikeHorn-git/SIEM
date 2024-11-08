@@ -1,0 +1,49 @@
+# frozen_string_literal: true
+
+Vagrant.configure('2') do |config|
+  config.vm.box = 'archlinux/archlinux'
+  config.vm.box_version = '20241001.267073'
+
+  config.vm.hostname = 'arch'
+  config.vm.synced_folder '.', '/vagrant', disabled: true
+
+  config.vm.network 'public_network', bridge: 'wlp0s20f3'
+  config.vm.network 'private_network', ip: '192.168.56.30'
+
+  config.vm.provider 'virtualbox' do |vb|
+    vb.cpus = 1
+    vb.memory = '1024'
+    vb.name = 'Arch'
+    vb.customize ['modifyvm', :id, '--clipboard', 'bidirectional']
+  end
+
+  config.vm.provision 'shell', inline: <<-SHELL, privileged: false
+      sudo pacman -Syyu --noconfirm
+
+      # Set static IP
+      sudo pacman -S networkmanager --noconfirm
+      sudo systemctl enable --now NetworkManager
+
+      sudo nmcli connection add type ethernet ifname eth0 con-name eth0-static \
+      ipv4.addresses 192.168.56.30/24 \
+      ipv4.gateway 192.168.56.1 \
+      ipv4.dns "1.1.1.1 1.0.0.1" \
+      ipv4.method manual
+
+      # Bring the network connection up
+      sudo nmcli connection up eth0-static
+
+      # Optional: restart the connection to apply
+      sudo nmcli connection down eth0-static
+      sudo nmcli connection up eth0-static
+
+      sudo pacman -S --noconfirm --needed base-devel git go
+      git clone https://aur.archlinux.org/yay.git
+      cd yay
+      makepkg -si --noconfirm
+      cd ..
+      rm -rf ./yay
+      yay -S --noconfirm wazuh-agent
+      sudo systemctl enable --now wazuh-agent
+  SHELL
+end

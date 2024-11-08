@@ -1,0 +1,138 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{
+ a4paper,
+ total={170mm,257mm},
+ left=20mm,
+ top=20mm,
+}
+\usepackage{titling}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{cmbright}
+
+\title{SIEM}
+\date{2024}
+
+\fancypagestyle{plain}{% the preset of fancyhdr
+    \fancyhf{} % clear all header and footer fields
+    \fancyfoot[R]{\includegraphics[width=2cm]{KULEUVEN_GENT_RGB_LOGO.png}}
+    \fancyfoot[L]{\thedate}
+    \fancyhead[L]{Ecole 2600}
+    \fancyhead[R]{\href{https://github.com/MikeHorn-git/}{Github}}
+}
+
+\makeatletter
+\def\@maketitle{%
+  \newpage
+  \null
+  \vskip 1em%
+  \begin{center}%
+  \let \footnote \thanks
+    {\LARGE \@title \par}%
+    \vskip 1em%
+  \end{center}%
+  \par
+  \vskip 1em}
+\makeatother
+
+\begin{document}
+
+\maketitle
+
+\noindent\begin{tabular}{@{}ll}
+    Students & MikeHorn
+\end{tabular}
+
+\section*{Contexte}
+Ce \href{https://github.com/MikeHorn-git/SIEM}{projet} est construit via Vagrant, et le rapport est rédigé en LaTeX.
+
+\section{Vagrantfiles}
+
+\begin{itemize}
+    \item Agent Wazuh basé sur Arch
+    \item ELK basé sur CentOS
+    \item Wazuh basé sur CentOS
+    \item Agent Wazuh basé sur Debian
+    \item Configuration réseau
+    \item Déploiement de l'agent Wazuh
+\end{itemize}
+
+\section{Réseau}
+
+L'utilisation de VirtualBox comme passerelle permet de configurer les adresses IP suivantes :
+
+\begin{itemize}
+    \item Arch : 192.168.56.30
+    \item Debian : 192.168.56.40
+    \item ELK : 192.168.56.20
+    \item Wazuh : 192.168.56.10
+\end{itemize}
+
+\section{Agents}
+
+\subsection{Wazuh}
+Le déploiement de l'agent se fait sur une Debian (voir \texttt{wazuh\_agent\_deploiement.png}).  
+Une fois les machines clientes Arch et Debian configurées, les agents sont bien visibles dans le menu des agents (voir \texttt{wazuh\_agent\_homepage.png}).
+
+\subsection{ELK}
+Pour installer Fleet sur une machine ELK, suivez ces étapes :
+
+\begin{enumerate}
+    \item Installez l'Elastic Agent depuis le site officiel : 
+    \begin{verbatim}
+    sudo yum install -y https://artifacts.elastic.co/downloads/elastic-agent/elastic-agent-8.x.x-x86_64.rpm
+    \end{verbatim}
+    \item Enregistrez l'agent avec Fleet Server :
+    \begin{verbatim}
+    sudo elastic-agent enroll --url=http://<FLEET_SERVER_URL> --enrollment-token=<ENROLLMENT_TOKEN>
+    \end{verbatim}
+    \item Activez et démarrez l'Elastic Agent :
+    \begin{verbatim}
+    sudo systemctl enable elastic-agent
+    sudo systemctl start elastic-agent
+    \end{verbatim}
+    \item Vérifiez dans Kibana que l'agent est bien inscrit sous \texttt{Fleet > Agents}.
+\end{enumerate}
+
+\section{Règles de détection}
+
+\subsection{Wazuh}
+Le GitHub de Wazuh contient des \href{https://github.com/wazuh/wazuh/tree/master/ruleset/rules}{règles} prédéfinies. Nous utilisons ici le fichier `0010-rules\_config.xml`. Selon la documentation de \href{https://documentation.wazuh.com/current/user-manual/ruleset/index.html}{Wazuh}, ce fichier de règles se situe dans `/var/ossec/etc/rules`.
+
+Pour Elastic Security, nous créons une règle personnalisée en utilisant le Kibana Query Language (KQL) afin de détecter les tentatives de connexion SSH échouées. La règle suivante filtre les événements signalant une tentative de connexion SSH échouée :
+
+\begin{verbatim}
+event.module: "system" AND event.dataset: "login" AND event.action: "ssh_login" AND event.outcome: "failure"
+\end{verbatim}
+
+\subsection{ELK}
+Cette règle peut être configurée avec les paramètres suivants :
+\begin{itemize}
+    \item \textbf{Nom} : Tentatives de connexion SSH échouées
+    \item \textbf{Index} : \texttt{filebeat-*}
+    \item \textbf{Fréquence} : Toutes les 5 minutes
+    \item \textbf{Actions d'alerte} : Notifications par e-mail ou via Slack
+\end{itemize}
+
+En appliquant cette configuration, Elastic Security surveille les événements en temps réel et génère des alertes pour les tentatives de connexion non autorisées.
+
+\section*{Conclusion}
+Ce projet a permis de mettre en place une infrastructure de surveillance et de détection d'intrusions utilisant Wazuh et ELK, avec une intégration de plusieurs agents déployés sur différents systèmes d'exploitation. La configuration de règles de détection personnalisées a fourni un cadre flexible pour identifier les tentatives d'accès non autorisées, notamment les connexions SSH échouées. Grâce aux capacités d'analyse en temps réel d'Elastic Security et aux notifications configurées, cette infrastructure est un atout essentiel pour renforcer la sécurité d'un environnement de production.
+
+En somme, cette configuration démontre l'efficacité de l'utilisation combinée de Wazuh et ELK pour la gestion proactive des incidents de sécurité, tout en restant adaptable et extensible pour répondre aux besoins futurs.
+
+\newpage
+\section*{Annexes : Screenshots}
+Les images suivantes sont jointes pour référence :
+
+\begin{itemize}
+    \item \texttt{wazuh\_agent\_deploiement.png} : Interface de déploiement de l'agent Wazuh.
+    \item \texttt{wazuh\_agent\_homepage.png} : Page d'accueil des agents dans l'interface Wazuh, montrant les connexions des agents.
+    \item \texttt{elk\_detection\_rule.png} : Capture d'écran de la règle de détection des tentatives de connexion SSH échouées dans ELK.
+    \item \texttt{network\_configuration.png} : Schéma de configuration réseau montrant les adresses IP assignées aux différentes machines virtuelles.
+\end{itemize}
+
+\end{document}
