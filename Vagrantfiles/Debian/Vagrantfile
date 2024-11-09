@@ -1,0 +1,39 @@
+# frozen_string_literal: true
+
+Vagrant.configure('2') do |config|
+  config.vm.box = 'generic/debian12'
+  config.vm.box_version = '4.3.12'
+
+  config.vm.hostname = 'debian'
+  config.vm.synced_folder '.', '/vagrant', disabled: true
+
+  config.vm.network 'public_network', bridge: 'wlp0s20f3'
+  config.vm.network 'private_network', ip: '192.168.56.40'
+
+  config.vm.provider 'virtualbox' do |vb|
+    vb.cpus = 1
+    vb.memory = '1024'
+    vb.name = 'Debian'
+    vb.customize ['modifyvm', :id, '--clipboard', 'bidirectional']
+  end
+
+  config.vm.provision 'shell', inline: <<-SHELL, privileged: false
+      sudo apt update
+      # Set static IP
+      sudo apt install network-manager -y
+      sudo systemctl enable --now NetworkManager
+
+      sudo nmcli connection add type ethernet ifname eth2 con-name eth2-static \
+      ipv4.addresses 192.168.56.40/24 \
+      ipv4.gateway 192.168.56.1 \
+      ipv4.dns "1.1.1.1 1.0.0.1" \
+      ipv4.method manual
+
+      # Bring the network connection up
+      sudo nmcli connection up eth2-static
+
+      # Optional: restart the connection to apply
+      sudo nmcli connection down eth2-static
+      sudo nmcli connection up eth2-static
+  SHELL
+end
